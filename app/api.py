@@ -46,11 +46,7 @@ def divide(op_1, op_2):
 
         if num_2 == 0:
             return jsonify({"error": "La división por cero no está permitida"}), http.client.NOT_ACCEPTABLE
-
-        # Realizar división si num_2 no es cero
-        result = CALCULATOR.divide(num_1, num_2)
-        return jsonify({"result": result}), http.client.OK
         
-        # return ("{}".format(CALCULATOR.divide(num_1, num_2)), http.client.OK, HEADERS)
+        return ("{}".format(CALCULATOR.divide(num_1, num_2)), http.client.OK, HEADERS)
     except TypeError as e:
         return (str(e), http.client.BAD_REQUEST, HEADERS)
