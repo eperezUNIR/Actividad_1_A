@@ -29,14 +29,14 @@ pipeline {
                         set PYTHONPATH=C:\\jenkins\\Agente_3_Reto2\\jenkins\\workspace\\Actividad_1_A_Reto2
                         C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\pytest --junitxml=result-unit.xml test\\unit
                     '''
-                    stash includes: '**', name:'repositorio2'
+                    stash includes: 'result-unit.xml', name:'result-unit.xml'
                }
             }
         }   
         stage('Rest') {
             agent {label 'windows4'}
             steps {
-                unstash 'repositorio2'
+                unstash 'repositorio'
                 bat '''
                     set FLASK_APP=app\\api.py
                     set FLASK_ENV=development
@@ -46,14 +46,15 @@ pipeline {
                     
                     C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\pytest --junitxml=result-rest.xml test\\rest
                 '''
-                stash includes: '**', name:'repositorio3'
+                stash includes: 'result-rest.xml', name:'result-rest.xml'
             }    
         }
 
         stage('Results') {
             agent {label 'windows5'}
             steps {
-                unstash 'repositorio3'
+                unstash 'result-unit.xml'
+                unstash 'result-rest.xml'
                 junit 'result*.xml' 
             }
         }
