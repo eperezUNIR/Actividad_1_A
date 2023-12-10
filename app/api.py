@@ -9,7 +9,6 @@ CALCULATOR = Calculator()
 api_application = Flask(__name__)
 HEADERS = {"Content-Type": "text/plain", "Access-Control-Allow-Origin": "*"}
 
-
 @api_application.route("/")
 def hello():
     return "Hello from The Calculator!\n"
@@ -37,5 +36,21 @@ def multiply(op_1, op_2):
     try:
         num_1, num_2 = util.convert_to_number(op_1), util.convert_to_number(op_2)
         return ("{}".format(CALCULATOR.multiply(num_1, num_2)), http.client.OK, HEADERS)
+    except TypeError as e:
+        return (str(e), http.client.BAD_REQUEST, HEADERS)
+
+@api_application.route("/calc/divide/<op_1>/<op_2>", methods=["GET"])
+def divide(op_1, op_2):
+    try:
+        num_1, num_2 = util.convert_to_number(op_1), util.convert_to_number(op_2)
+
+        if num_2 == 0:
+            return jsonify({"error": "La división por cero no está permitida"}), http.client.NOT_ACCEPTABLE
+
+        # Realizar división si num_2 no es cero
+        result = CALCULATOR.divide(num_1, num_2)
+        return jsonify({"result": result}), http.client.OK
+        
+        # return ("{}".format(CALCULATOR.divide(num_1, num_2)), http.client.OK, HEADERS)
     except TypeError as e:
         return (str(e), http.client.BAD_REQUEST, HEADERS)
