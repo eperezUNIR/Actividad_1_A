@@ -9,6 +9,11 @@ pipeline {
                 git 'https://github.com/eperezUNIR/Actividad_1_A.git'
                 stash includes: '**', name:'repositorio'
             }
+            post {
+                always {
+                    cleanWs()
+                }
+            }
         }
     
         stage('Build') {
@@ -17,7 +22,12 @@ pipeline {
               echo 'Eyyy, esto es Python. No hay que compilar nada!!!'
 	          echo WORKSPACE
               bat 'dir'
-           }
+            }
+            post {
+                always {
+                    cleanWs()
+                }
+            }
         }
         
         stage('Unit') {
@@ -31,6 +41,11 @@ pipeline {
                     '''
                     stash includes: 'result-unit.xml', name:'result-unit.xml'
                }
+            }
+            post {
+                always {
+                    cleanWs()
+                }
             }
         }   
         stage('Rest') {
@@ -47,7 +62,8 @@ pipeline {
                     C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\pytest --junitxml=result-rest.xml test\\rest
                 '''
                 stash includes: 'result-rest.xml', name:'result-rest.xml'
-            }    
+            }
+
         }
 
         stage('Results') {
@@ -57,7 +73,13 @@ pipeline {
                 unstash 'result-rest.xml'
                 junit 'result*.xml' 
             }
+            post {
+                always {
+                    cleanWs()
+                }
+            }
         }
      
     }
+    
 }
