@@ -1,1 +1,187 @@
+pipeline
+{
+    agent any
 
+    stages
+    {
+        stage('Get Code')
+        {
+            steps {
+                // Obtener código del repo
+                git 'https://github.com/eperezUNIR/Actividad_1_A.git'
+                stash includes: '**', name:'repositorio'
+            }
+            post {
+                always {
+                    cleanWs()
+                }
+            }
+            
+        }
+        // Todos los tests
+        stage('Pruebas_Paralelas')
+        {
+            parallel
+            {
+                stage('Unit')
+                {
+                    agent {label 'windows1'}
+                    steps
+                    {
+                        //catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                        unstash 'repositorio'
+                        bat '''
+                            echo %PYTHONPATH%
+                            set PYTHONPATH=C:\\jenkins\\Agente_1_Reto2\\jenkins\\workspace\\Actividad_1B_2
+                            echo %PYTHONPATH%
+                            C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\pytest --junitxml=result-unit.xml test\\unit
+                        '''
+                        junit 'result*.xml'
+                    }
+                    post {
+                        always {
+                            cleanWs()
+                        }
+                    }
+                }
+               
+                stage('Rest')
+                {
+                    agent {label 'windows2'}
+                    steps
+                    {
+                        unstash 'repositorio'
+                        bat '''
+                            set FLASK_APP=app\\api.py
+                            set FLASK_ENV=development
+                            
+                            set PYTHONPATH=C:\\jenkins\\Agente_2_Reto2\\jenkins\\workspace\\Actividad_1B_2
+                            start C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\flask run
+                            start java -jar c:\\Users\\Eduardo\\Dropbox\\UNIR\\PADC\\wiremock-standalone-3.3.1.jar --port 9999 --root-dir C:\\jenkins\\Agente_2_Reto2\\jenkins\\workspace\\Actividad_1B_2\\test\\wiremock
+                            
+                            ping 127.0.0.1 -n 10
+                            
+                            C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\pytest --junitxml=result-rest.xml test\\rest
+                        '''
+                        junit 'result*.xml'
+                    }
+
+                }
+                stage('Static')
+                {
+                    agent {label 'windows3'}
+                    steps
+                    {
+                        unstash 'repositorio'
+                        bat '''
+                            
+                            set PYTHONPATH=C:\\jenkins\\Agente_3_Reto2\\jenkins\\workspace\\Actividad_1B_2
+                            C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\flake8 --format=pylint --exit-zero app >flake8.out
+                            
+                        '''
+                        recordIssues tools:[flake8(name: 'Flake8', pattern: 'flake8.out')], qualityGates: [[threshold:8, type: 'TOTAL', unstable: true], [threshold: 10, type: 'TOTAL', unstable: false]]
+        
+                    }
+                    post {
+                        always {
+                            cleanWs()
+                        }
+                    }
+                }
+                stage('Security Test')
+                {
+                    agent {label 'windows4'}
+                    steps
+                    {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            unstash 'repositorio'
+                            
+                            bat '''
+                                set PYTHONPATH=C:\\jenkins\\Agente_4_Reto2\\jenkins\\workspace\\Actividad_1B_2
+                                C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\bandit --exit-zero -r . -o bandit.out -f txt
+                                ping 127.0.0.1 -n 3
+                            '''
+                            // Analizar los resultados de Bandit
+                            script {
+                                if (fileExists('bandit.out')) {
+                                    def banditOutput = readFile('bandit.out').trim().split("\n")
+                                    int issueCount = 0
+            
+                                    // Contar el número de problemas
+                                    banditOutput.each { line ->
+                                        if (line.startsWith(">> Issue:")) {
+                                            issueCount++
+                                        }
+                                    }
+            
+                                    echo "Total de problemas de seguridad encontrados: ${issueCount}"
+            
+                                    if (issueCount > 3) {
+                                        currentBuild.result = 'FAILURE'
+                                        echo 'Mas de tres problemas de seguridad. Marcando el pipeline como fallido.'
+                                    } else if (issueCount > 2) {
+                                        currentBuild.result = 'UNSTABLE'
+                                        echo 'Mas de un problema de seguridad encontrado. Marcando el pipeline como inestable.'
+                                    }
+                                    
+                                    
+                                } else {
+                                    echo 'El archivo de resultados de Bandit no existe.'
+                                }
+                            }
+                            
+                            //recordIssues tools:[pyLint(pattern: 'bandit.out', name:'Bandit')], qualityGates: [[threshold: 1, type: 'TOTAL', unstable: true], [threshold: 2, type: 'TOTAL', unstable: false]]
+                        }    
+                    }
+                    post {
+                        always {
+                            cleanWs()
+                        }
+                    }
+                }
+                
+                stage('Coverage')
+                {
+                    agent {label 'windows5'}
+                    steps
+                    {
+                        unstash 'repositorio'
+                        bat '''
+                            set PYTHONPATH=C:\\jenkins\\Agente_5_Reto2\\jenkins\\workspace\\Actividad_1B_2
+                            C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\coverage run --source=app --omit=app\\__init__.py,app\\api.py -m pytest test\\unit
+                            C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\coverage xml
+                        '''
+                        cobertura coberturaReportFile: 'coverage.xml', onlyStable: false, conditionalCoverageTargets: '90,80,80', lineCoverageTargets: '95,85,85'
+                    }
+                    post {
+                        always {
+                            cleanWs()
+                        }
+                    }
+                }
+        
+            }
+        }
+        stage('Performance')
+        {
+            steps
+            {
+                unstash 'repositorio'
+                bat '''
+                    set FLASK_APP=app\\api.py
+                    set FLASK_ENV=development
+                    set PYTHONPATH=C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\Actividad_1B_2
+                    start C:\\Users\\Eduardo\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\flask run
+                    
+                    ping 127.0.0.1 -n 10
+                    
+                    C:\\ProgramData\\apache-jmeter-5.6.3\\bin\\jmeter -n -t test\\jmeter\\flask.jmx -f -l flask.jtl
+                    
+                '''
+                perfReport sourceDataFiles: 'flask.jtl'
+            }
+
+        }
+        
+    }
+}
